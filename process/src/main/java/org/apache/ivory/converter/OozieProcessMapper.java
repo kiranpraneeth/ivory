@@ -306,6 +306,8 @@ public class OozieProcessMapper extends AbstractOozieEntityMapper<Process> {
         nominalTimeForExtId = nominalTimeForExtId.replace("#VAL#", String.valueOf(offset));
         props.put(OozieClient.EXTERNAL_ID, new ExternalId(process.getName(), process.getWorkflowNameTag(coordName), nominalTimeForExtId).getId());
 
+        List<String> ignoreFeeds = getIgnoreFeeds();
+        
         // inputs
         if (process.getInputs() != null) {
             StringBuffer ivoryInPaths = new StringBuffer();
@@ -331,8 +333,10 @@ public class OozieProcessMapper extends AbstractOozieEntityMapper<Process> {
                     inputExpr = "${coord:dataIn('" + input.getName() + "')}";
                 }
                 props.put(input.getName(), inputExpr);
-                ivoryInPaths.append(inputExpr).append('#');
-                props.put("ivoryInPaths", ivoryInPaths.substring(0, ivoryInPaths.length() - 1));
+                if(!ignoreFeeds.contains(input.getName())) {
+                    ivoryInPaths.append(inputExpr).append('#');
+                    props.put("ivoryInPaths", ivoryInPaths.substring(0, ivoryInPaths.length() - 1));
+                }
             }
         }
 
