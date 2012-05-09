@@ -20,6 +20,7 @@ package org.apache.ivory.converter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -43,6 +44,7 @@ import org.apache.ivory.entity.v0.process.Input;
 import org.apache.ivory.entity.v0.process.LateProcess;
 import org.apache.ivory.entity.v0.process.Output;
 import org.apache.ivory.entity.v0.process.Process;
+import org.apache.ivory.entity.v0.process.Property;
 import org.apache.ivory.latedata.LateDataUtils;
 import org.apache.ivory.messaging.EntityInstanceMessage;
 import org.apache.ivory.oozie.coordinator.CONTROLS;
@@ -72,6 +74,8 @@ public class OozieProcessMapper extends AbstractOozieEntityMapper<Process> {
 
     private static final String DEFAULT_WF_TEMPLATE = "/config/workflow/process-parent-workflow.xml";
     private static final String LATE_WF_TEMPLATE = "/config/workflow/process-late1-workflow.xml";
+
+    private static final String IGNORE_FEEDS_PROPERTY = "ivory.ignore.feeds";
 
     public OozieProcessMapper(Process entity) {
         super(entity);
@@ -140,6 +144,8 @@ public class OozieProcessMapper extends AbstractOozieEntityMapper<Process> {
         // Configuration
         Map<String, String> props = createCoordDefaultConfiguration(cluster, coordPath, coordName);
 
+        List<String> ignoreFeeds = getIgnoreFeeds();
+        
         // inputs
         if (process.getInputs() != null) {
             StringBuffer ivoryInPaths = new StringBuffer();
@@ -165,8 +171,10 @@ public class OozieProcessMapper extends AbstractOozieEntityMapper<Process> {
                     inputExpr = "${coord:dataIn('" + input.getName() + "')}";
                 }
                 props.put(input.getName(), inputExpr);
-                ivoryInPaths.append(inputExpr).append('#');
-                props.put("ivoryInPaths", ivoryInPaths.substring(0, ivoryInPaths.length() - 1));
+                if(!ignoreFeeds.contains(input.getName())) {
+                    ivoryInPaths.append(inputExpr).append('#');
+                    props.put("ivoryInPaths", ivoryInPaths.substring(0, ivoryInPaths.length() - 1));
+                }
             }
         }
 
@@ -217,6 +225,16 @@ public class OozieProcessMapper extends AbstractOozieEntityMapper<Process> {
         coord.setAction(action);
 
         return coord;
+    }
+
+    private List<String> getIgnoreFeeds() {
+        Process process = getEntity();
+        if(process.getProperties() != null) {
+            for(Property prop:process.getProperties().getProperty())
+                if(prop.getName().equals(IGNORE_FEEDS_PROPERTY) && StringUtils.isNotEmpty(prop.getValue()))
+                    return Arrays.asList(prop.getValue().split(","));
+        }
+        return new ArrayList<String>();
     }
 
     public COORDINATORAPP createLateCoordinator(Cluster cluster, Path bundlePath) throws IvoryException {
